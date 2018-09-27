@@ -24,8 +24,6 @@ class TestMzMLLoaderScanBehavior(unittest.TestCase):
             MzMLLoader.prebuild_byte_offset_file(self.path)
             parser = MzMLLoader._parser_cls(self.path)
             assert parser._check_has_byte_offset_file()
-            assert isinstance(parser._offset_index,
-                              xml_reader.PrebuiltOffsetIndex)
         except OSError:
             pass
 
