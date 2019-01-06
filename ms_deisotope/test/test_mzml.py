@@ -1,4 +1,5 @@
 import unittest
+import os
 
 from ms_deisotope.data_source import MzMLLoader
 from ms_deisotope.test.common import datafile
@@ -24,10 +25,16 @@ class TestMzMLLoaderScanBehavior(unittest.TestCase):
         return reader
 
     def test_index_building(self):
+        MzMLLoader.prebuild_byte_offset_file(self.path)
+        parser = MzMLLoader._parser_cls(self.path)
+        assert parser._check_has_byte_offset_file()
+        index = parser.index
+        offsets = index['spectrum']
+        key_list = list(offsets.keys())
+        assert key_list == scan_ids
+        offset_file_name = parser._byte_offset_filename
         try:
-            MzMLLoader.prebuild_byte_offset_file(self.path)
-            parser = MzMLLoader._parser_cls(self.path)
-            assert parser._check_has_byte_offset_file()
+            os.remove(offset_file_name)
         except OSError:
             pass
 
