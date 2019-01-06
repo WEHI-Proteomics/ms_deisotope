@@ -1,1 +1,1 @@
-{"keys": ["spectrum"], "index": {"spectrum": {"controllerType=0 controllerNumber=1 scan=10014": 3799, "controllerType=0 controllerNumber=1 scan=10015": 158797, "controllerType=0 controllerNumber=1 scan=10016": 188056}}, "@pyteomics_schema_version": [1, 0, 0]}
+{"@pyteomics_schema_version": [1, 0, 0], "keys": ["spectrum"], "index": {"spectrum": {"controllerType=0 controllerNumber=1 scan=10014": 3799, "controllerType=0 controllerNumber=1 scan=10015": 158797, "controllerType=0 controllerNumber=1 scan=10016": 188056}}}
