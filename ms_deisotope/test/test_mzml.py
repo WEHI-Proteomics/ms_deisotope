@@ -17,7 +17,10 @@ class TestMzMLLoaderScanBehavior(unittest.TestCase):
 
     @property
     def reader(self):
-        return infer_type.MSFileLoader(self.path)
+        reader = infer_type.MSFileLoader(self.path)
+        assert list(reader.index.index_sequence) == sorted(
+            reader.index.index_sequence, key=lambda x: x[1])
+        return reader
 
     def test_index_building(self):
         try:
@@ -26,6 +29,12 @@ class TestMzMLLoaderScanBehavior(unittest.TestCase):
             assert parser._check_has_byte_offset_file()
         except OSError:
             pass
+
+    def test_index_integrity(self):
+        reader = self.reader
+        reader.make_iterator(grouped=False)
+        for i, scan in enumerate(reader):
+            assert i == scan.index
 
     def test_iteration(self):
         reader = self.reader
