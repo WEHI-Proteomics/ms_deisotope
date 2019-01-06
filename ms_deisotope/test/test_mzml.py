@@ -2,7 +2,7 @@ import unittest
 
 from ms_deisotope.data_source import MzMLLoader
 from ms_deisotope.test.common import datafile
-from ms_deisotope.data_source import infer_type, xml_reader
+from ms_deisotope.data_source import infer_type
 
 scan_ids = [
     "controllerType=0 controllerNumber=1 scan=10014",
@@ -18,6 +18,7 @@ class TestMzMLLoaderScanBehavior(unittest.TestCase):
     @property
     def reader(self):
         reader = infer_type.MSFileLoader(self.path)
+        assert reader.index.from_index(0) == scan_ids[0]
         assert list(reader.index.index_sequence) == sorted(
             reader.index.index_sequence, key=lambda x: x[1])
         return reader
