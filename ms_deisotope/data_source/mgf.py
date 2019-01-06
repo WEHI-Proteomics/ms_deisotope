@@ -150,6 +150,9 @@ class MGFLoader(MGFInterface, RandomAccessScanSource, ScanIterator):
         self.initialize_scan_cache()
         self.make_iterator()
 
+    def __reduce__(self):
+        return self.__class__, (self.source_file, self.encoding, self._use_index, )
+
     def has_msn_scans(self):
         return True
 
