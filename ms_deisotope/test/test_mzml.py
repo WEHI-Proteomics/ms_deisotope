@@ -19,6 +19,7 @@ class TestMzMLLoaderScanBehavior(unittest.TestCase):
     @property
     def reader(self):
         reader = infer_type.MSFileLoader(self.path)
+        assert len(reader.index) == 3
         assert reader.index.from_index(0) == scan_ids[0]
         assert list(reader.index.index_sequence) == sorted(
             reader.index.index_sequence, key=lambda x: x[1])
