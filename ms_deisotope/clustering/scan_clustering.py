@@ -43,6 +43,18 @@ class SpectrumCluster(object):
     def append(self, item):
         self.scans.append(item)
 
+    def average_similarity(self, *args, **kwargs):
+        n = len(self)
+        if n == 1:
+            return 1.0
+        ratings = []
+        for i in range(n):
+            scan_i = self[i]
+            for j in range(i + 1, n):
+                scan_j = self[j]
+                ratings.append(peak_set_similarity(scan_i, scan_j, *args, **kwargs))
+        return sum(ratings) / len(ratings)
+
 
 def binsearch(array, x):
     n = len(array)
@@ -53,6 +65,7 @@ def binsearch(array, x):
         mid = (hi + lo) // 2
         y = array[mid].neutral_mass
         err = y - x
+        # Do refinement in :func:`cluster_scans`
         if hi - lo == 1:
             return mid
         elif err > 0:
@@ -103,6 +116,25 @@ def cluster_scans(scans, precursor_error_tolerance=1e-5, minimum_similarity=0.1)
         else:
             best_cluster.append(scan)
     return clusters
+
+
+def iterative_clustering(scans, precursor_error_tolerance=1e-5, similarity_thresholds=None):
+    if similarity_thresholds is None:
+        similarity_thresholds = [0.1, .4, 0.7]
+    singletons = []
+    to_bisect = [scans]
+    for similarity_threshold in similarity_thresholds:
+        next_to_bisect = []
+        for group in to_bisect:
+            clusters = cluster_scans(
+                group, precursor_error_tolerance, minimum_similarity=similarity_threshold)
+            for cluster in clusters:
+                if len(cluster) == 1:
+                    singletons.append(cluster)
+                else:
+                    next_to_bisect.append(cluster)
+        to_bisect = next_to_bisect
+    return sorted(list(singletons) + list(to_bisect))
 
 
 class ScanClusterWriter(object):
