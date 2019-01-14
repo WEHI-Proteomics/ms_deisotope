@@ -56,6 +56,90 @@ class SpectrumCluster(object):
         return sum(ratings) / len(ratings)
 
 
+class SpectrumClusterCollection(object):
+    def __init__(self, clusters=None):
+        if clusters is None:
+            clusters = []
+        self.clusters = list(clusters)
+
+    def add(self, cluster):
+        bisect.insort(self.clusters, cluster)
+
+    def __getitem__(self, i):
+        return self.clusters[i]
+
+    def __setitem__(self, i, value):
+        self.clusters[i] = value
+
+    def __len__(self):
+        return len(self.clusters)
+
+    def __iter__(self):
+        return iter(self.clusters)
+
+    def __repr__(self):
+        template = "{self.__class__.__name__}({size})"
+        size = len(self)
+        return template.format(self=self, size=size)
+
+    def _binary_search(self, mass, error_tolerance=1e-5):
+        array = self.clusters
+        n = len(array)
+        lo = 0
+        hi = n
+
+        while hi != lo:
+            mid = (hi + lo) // 2
+            y = array[mid].neutral_mass
+            err = (y - mass) / mass
+            if hi - lo == 1:
+                best_index = mid
+                best_error = abs(err)
+                i = mid - 1
+                while i >= 0:
+                    x = self.structures[i]
+                    err = abs((x.neutral_mass - mass) / mass)
+                    if err < best_error:
+                        best_error = err
+                        best_index = i
+                    elif err > error_tolerance:
+                        break
+                    i -= 1
+                lo_index = i + 1
+                i = mid + 1
+                while i < n:
+                    x = self.structures[i]
+                    err = abs((x.neutral_mass - mass) / mass)
+                    if err < best_error:
+                        best_error = err
+                        best_index = i
+                    elif err > error_tolerance:
+                        break
+                    i += 1
+                hi_index = i
+                return best_index, lo_index, hi_index
+            elif err > 0:
+                hi = mid
+            else:
+                lo = mid
+        return 0, 0, 0
+
+    def find(self, mass, error_tolerance=1e-5):
+        target_ix, lo_ix, hi_ix = self._binary_search(mass, error_tolerance)
+        target = self[target_ix]
+        if abs(target.neutral_mass - mass) / mass > error_tolerance:
+            return None
+        return target
+
+    def find_all(self, mass, error_tolerance=1e-5):
+        target_ix, lo_ix, hi_ix = self._binary_search(mass, error_tolerance)
+        result = [
+            target for target in self[lo_ix:hi_ix]
+            if abs(target.neutral_mass - mass) / mass <= error_tolerance
+        ]
+        return result
+
+
 def binsearch(array, x):
     n = len(array)
     lo = 0
