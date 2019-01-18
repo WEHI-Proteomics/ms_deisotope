@@ -289,7 +289,7 @@ def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresh
     msn_scans = []
     for path in paths:
         reader, index = _ensure_metadata_index(path)
-        msn_scans.extend([reader.get_scan_by_id(i) for i in index.msn_ids])
+        msn_scans.extend([reader.get_scan_by_id(i).pick_peaks() for i in index.msn_ids])
     clusters = iterative_clustering(
         msn_scans, precursor_error_tolerance, similarity_thresholds)
     with click.open_file(output_path, mode='w') as outfh:
