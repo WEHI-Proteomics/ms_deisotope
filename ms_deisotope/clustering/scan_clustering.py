@@ -229,7 +229,12 @@ class ScanClusterWriter(object):
         self.stream.write(data)
 
     def save(self, cluster):
-        self.write("%f\t%d\n" % (cluster.neutral_mass, len(cluster)))
+        self.write("%f\t%d\t%f\n" % (cluster.neutral_mass, len(cluster), cluster.average_similarity()))
         for member in cluster:
-            self.write("\t%s\n" % member.id)
+            member_source = member.source
+            if member_source is not None:
+                source_name = member_source.source_file
+            else:
+                source_name = ":detatched:"
+            self.write("\t%s\t%s\n" % (source_name, member.id))
         self.write('\n')
