@@ -287,9 +287,26 @@ def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresh
     if output_path is None:
         output_path = "-"
     msn_scans = []
-    for path in paths:
-        reader, index = _ensure_metadata_index(path)
-        msn_scans.extend([reader.get_scan_by_id(i).pick_peaks() for i in index.msn_ids])
+    n_spectra = 0
+
+    with click.progressbar(paths, label="Indexing") as bar:
+        key_seqs = []
+        for path in bar:
+            reader, index = _ensure_metadata_index(path)
+            key_seqs.append((reader, index))
+            n_spectra += len(index.msn_ids)
+
+    def _show_scan_id(scan):
+        if scan is None:
+            return ''
+        return scan.id
+
+    with click.progressbar(label="Loading Spectra", length=n_spectra,
+                           item_show_func=_show_scan_id) as bar:
+        for reader, index in key_seqs:
+            for i in index.msn_ids:
+                msn_scans.append(reader.get_scan_by_id(i).pick_peaks().pack())
+                bar.update(1)
     clusters = iterative_clustering(
         msn_scans, precursor_error_tolerance, similarity_thresholds)
     with click.open_file(output_path, mode='w') as outfh:
