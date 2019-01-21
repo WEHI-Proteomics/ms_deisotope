@@ -305,7 +305,7 @@ def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresh
                            item_show_func=_show_scan_id) as bar:
         for reader, index in key_seqs:
             for i in index.msn_ids:
-                msn_scans.append(reader.get_scan_by_id(i).pick_peaks().pack())
+                msn_scans.append(reader.get_scan_by_id(i).pick_peaks())
                 bar.update(1)
     clusters = iterative_clustering(
         msn_scans, precursor_error_tolerance, similarity_thresholds)
