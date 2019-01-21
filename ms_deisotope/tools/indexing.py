@@ -289,20 +289,15 @@ def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresh
     msn_scans = []
     n_spectra = 0
 
-    with click.progressbar(paths, label="Indexing", item_show_func=lambda x: str(x)) as bar:
+    with click.progressbar(paths, label="Indexing", item_show_func=str) as bar:
         key_seqs = []
         for path in bar:
             reader, index = _ensure_metadata_index(path)
             key_seqs.append((reader, index))
             n_spectra += len(index.msn_ids)
 
-    def _show_scan_id(scan):
-        if scan is None:
-            return ''
-        return scan.id
-
     with click.progressbar(label="Loading Spectra", length=n_spectra,
-                           item_show_func=_show_scan_id) as bar:
+                           item_show_func=str) as bar:
         for reader, index in key_seqs:
             for i in index.msn_ids:
                 bar.current_item = i
