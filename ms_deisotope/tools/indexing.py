@@ -289,7 +289,7 @@ def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresh
     msn_scans = []
     n_spectra = 0
 
-    with click.progressbar(paths, label="Indexing") as bar:
+    with click.progressbar(paths, label="Indexing", item_show_func=lambda x: str(x)) as bar:
         key_seqs = []
         for path in bar:
             reader, index = _ensure_metadata_index(path)
@@ -305,8 +305,9 @@ def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresh
                            item_show_func=_show_scan_id) as bar:
         for reader, index in key_seqs:
             for i in index.msn_ids:
-                msn_scans.append(reader.get_scan_by_id(i).pick_peaks())
+                bar.current_item = i
                 bar.update(1)
+                msn_scans.append(reader.get_scan_by_id(i).pick_peaks())
     clusters = iterative_clustering(
         msn_scans, precursor_error_tolerance, similarity_thresholds)
     with click.open_file(output_path, mode='w') as outfh:
