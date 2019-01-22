@@ -1,7 +1,13 @@
+import operator
 import functools
 import bisect
 
 from .peak_set_similarity import peak_set_similarity
+
+from ms_deisotope.task import LogUtilsMixin
+
+peak_set_getter = operator.attrgetter("peak_set")
+deconvoluted_peak_set_getter = operator.attrgetter("deconvoluted_peak_set")
 
 
 def ppm_error(x, y):
@@ -140,7 +146,7 @@ class SpectrumClusterCollection(object):
         return result
 
 
-def binsearch(array, x):
+def binsearch_simple(array, x):
     n = len(array)
     lo = 0
     hi = n
@@ -159,66 +165,140 @@ def binsearch(array, x):
     return 0
 
 
-def cluster_scans(scans, precursor_error_tolerance=1e-5, minimum_similarity=0.1):
-    scans = sorted(scans, key=lambda x: sum(p.intensity for p in x.peak_set), reverse=True)
-    # the first scan is always the start of a new cluster
-    clusters = [SpectrumCluster([scans[0]])]
-    for scan in scans[1:]:
+class ScanClusterBuilder(LogUtilsMixin):
+    """Clusters spectra based upon peak pattern similarity
+
+    Attributes
+    ----------
+    clusters : :class:`SpectrumClusterCollection`
+        The clusters built so far
+    minimum_similarity : float
+        The minimum similarity score needed to consider two spectra
+        similar enough to form a cluster
+    peak_getter : :class:`Callable`
+        A function to call on each spectrum to retrieve the peak list
+        to cluster over
+    precursor_error_tolerance : float
+        The maximum precursor mass error (in PPM) to permit between
+        two spectra to consider comparing them
+    """
+
+    @classmethod
+    def _guess_peak_getter(cls, getter):
+        if getter is None:
+            return list
+        if callable(getter):
+            return getter
+        if isinstance(getter, basestring):
+            if getter == "d":
+                return deconvoluted_peak_set_getter
+            if getter in ('p', 'c'):
+                return peak_set_getter
+            else:
+                return operator.attrgetter(getter)
+        raise ValueError("Cannot infer peak set getter from %r" % (getter, ))
+
+    def __init__(self, clusters=None, precursor_error_tolerance=1e-5, minimum_similarity=0.1,
+                 peak_getter=None):
+        peak_getter = self._guess_peak_getter(peak_getter)
+        if clusters is None:
+            clusters = []
+        self.clusters = SpectrumClusterCollection(clusters)
+        self.precursor_error_tolerance = precursor_error_tolerance
+        self.minimum_similarity = minimum_similarity
+        self.peak_getter = peak_getter
+
+    def peak_set_similarity(self, scan_i, scan_j):
+        return peak_set_similarity(
+            self.peak_getter(scan_i),
+            self.peak_getter(scan_j))
+
+    def find_best_cluster_for_scan(self, scan):
         best_cluster = None
         best_similarity = 0.0
 
-        center_i = binsearch(clusters, scan.precursor_information.neutral_mass)
+        if len(self) == 0:
+            return best_cluster
+
+        center_i = binsearch_simple(self.clusters, scan.precursor_information.neutral_mass)
         i = center_i
 
         while i >= 0:
-            cluster = clusters[i]
+            cluster = self.clusters[i]
             if abs(ppm_error(scan.precursor_information.neutral_mass,
-                             cluster.neutral_mass)) > precursor_error_tolerance:
+                             cluster.neutral_mass)) > self.precursor_error_tolerance:
                 break
-            similarity = peak_set_similarity(scan, cluster[0])
+            similarity = self.peak_set_similarity(scan, cluster[0])
             i -= 1
-            if similarity > best_similarity and similarity > minimum_similarity:
+            if similarity > best_similarity and similarity > self.minimum_similarity:
                 best_similarity = similarity
                 best_cluster = cluster
 
-        n = len(clusters)
+        n = len(self.clusters)
         i = center_i + 1
         while i < n:
-            cluster = clusters[i]
+            cluster = self.clusters[i]
             if abs(ppm_error(scan.precursor_information.neutral_mass,
-                             cluster.neutral_mass)) > precursor_error_tolerance:
+                             cluster.neutral_mass)) > self.precursor_error_tolerance:
                 break
-            similarity = peak_set_similarity(scan, cluster[0])
+            similarity = self.peak_set_similarity(scan, cluster[0])
             i += 1
-            if similarity > best_similarity and similarity > minimum_similarity:
+            if similarity > best_similarity and similarity > self.minimum_similarity:
                 best_similarity = similarity
                 best_cluster = cluster
+        return best_cluster
 
-        if best_cluster is None:
-            cluster = SpectrumCluster([scan])
-            bisect.insort(clusters, cluster)
-        else:
+    def add_scan(self, scan):
+        best_cluster = self.find_best_cluster_for_scan(scan)
+        if best_cluster:
             best_cluster.append(scan)
-    return clusters
+        else:
+            self.clusters.add(SpectrumCluster([scan]))
+
+    def __iter__(self):
+        return iter(self.clusters)
+
+    def __len__(self):
+        return len(self.clusters)
+
+    def __getitem__(self, i):
+        return self.clusters[i]
+
+    @classmethod
+    def cluster_scans(cls, scans, precursor_error_tolerance=1e-5, minimum_similarity=0.1,
+                      peak_getter=None):
+        self = cls([], precursor_error_tolerance, minimum_similarity, peak_getter)
+        scans = sorted(scans, key=lambda x: sum(p.intensity for p in self.peak_getter(x)), reverse=True)
+        for scan in scans:
+            self.add_scan(scan)
+        return self.clusters
+
+    @classmethod
+    def iterative_clustering(cls, scans, precursor_error_tolerance=1e-5, similarity_thresholds=None,
+                             peak_getter=None):
+        peak_getter = cls._guess_peak_getter(peak_getter)
+        if similarity_thresholds is None:
+            similarity_thresholds = [0.1, .4, 0.7]
+        singletons = []
+        to_bisect = [scans]
+        for similarity_threshold in similarity_thresholds:
+            next_to_bisect = []
+            for group in to_bisect:
+                clusters = cls.cluster_scans(
+                    group, precursor_error_tolerance,
+                    minimum_similarity=similarity_threshold,
+                    peak_getter=peak_getter)
+                for cluster in clusters:
+                    if len(cluster) == 1:
+                        singletons.append(cluster)
+                    else:
+                        next_to_bisect.append(cluster)
+            to_bisect = next_to_bisect
+        return SpectrumClusterCollection(sorted(list(singletons) + list(to_bisect)))
 
 
-def iterative_clustering(scans, precursor_error_tolerance=1e-5, similarity_thresholds=None):
-    if similarity_thresholds is None:
-        similarity_thresholds = [0.1, .4, 0.7]
-    singletons = []
-    to_bisect = [scans]
-    for similarity_threshold in similarity_thresholds:
-        next_to_bisect = []
-        for group in to_bisect:
-            clusters = cluster_scans(
-                group, precursor_error_tolerance, minimum_similarity=similarity_threshold)
-            for cluster in clusters:
-                if len(cluster) == 1:
-                    singletons.append(cluster)
-                else:
-                    next_to_bisect.append(cluster)
-        to_bisect = next_to_bisect
-    return sorted(list(singletons) + list(to_bisect))
+cluster_scans = ScanClusterBuilder.cluster_scans
+iterative_clustering = ScanClusterBuilder.iterative_clustering
 
 
 class ScanClusterWriter(object):
