@@ -17,6 +17,7 @@ from ms_deisotope.data_source import _compression
 from ms_deisotope.data_source.scan import RandomAccessScanSource
 from ms_deisotope.data_source.metadata.file_information import SourceFile
 
+from ms_deisotope.output import ProcessedMzMLDeserializer
 
 from ms_deisotope.tools import conversion
 from ms_deisotope.tools.utils import processes_option
@@ -279,7 +280,10 @@ def precursor_clustering(path, grouping_error=2e-5):
 @click.option("-t", "--similarity-threshold", "similarity_thresholds", multiple=True, type=float)
 @click.option("-o", "--output", "output_path", type=click.Path(writable=True, file_okay=True, dir_okay=False),
               required=False)
-def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresholds=None, output_path=None):
+@click.option("-D", "--deconvoluted", is_flag=True, default=False, help=(
+    "Whether to assume the spectrum is deconvoluted or not"))
+def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresholds=None, output_path=None,
+                        deconvoluted=False):
     if not similarity_thresholds:
         similarity_thresholds = [0.1, 0.4, 0.7]
     else:
@@ -292,7 +296,11 @@ def spectrum_clustering(paths, precursor_error_tolerance=1e-5, similarity_thresh
     with click.progressbar(paths, label="Indexing", item_show_func=str) as bar:
         key_seqs = []
         for path in bar:
-            reader, index = _ensure_metadata_index(path)
+            if deconvoluted:
+                reader = ProcessedMzMLDeserializer(path)
+                index = reader.extended_index
+            else:
+                reader, index = _ensure_metadata_index(path)
             key_seqs.append((reader, index))
             n_spectra += len(index.msn_ids)
 
