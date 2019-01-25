@@ -318,3 +318,7 @@ class ScanClusterWriter(object):
                 source_name = ":detatched:"
             self.write("\t%s\t%s\n" % (source_name, member.id))
         self.write('\n')
+
+    def save_all(self, clusters):
+        for cluster in clusters:
+            self.save(cluster)
