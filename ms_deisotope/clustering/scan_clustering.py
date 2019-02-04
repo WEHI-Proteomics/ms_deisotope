@@ -1,6 +1,7 @@
 import operator
 import functools
 import bisect
+import json
 
 from .peak_set_similarity import peak_set_similarity
 
@@ -60,6 +61,21 @@ class SpectrumCluster(object):
                 scan_j = self[j]
                 ratings.append(peak_set_similarity(scan_i, scan_j, *args, **kwargs))
         return sum(ratings) / len(ratings)
+
+    def to_dict(self):
+        d = {}
+        d['neutral_mass'] = self.neutral_mass
+        d['size'] = len(self)
+        d['average_similarity'] = self.average_similarity()
+        scans = []
+        for scan in self:
+            scans.append({
+                "id": scan.id,
+                "source": scan.source.source_file if scan.source is not None else ":detatched:",
+                "neutral_mass": scan.precursor_information.neutral_mass,
+            })
+        d['scans'] = scans
+        return d
 
 
 class SpectrumClusterCollection(object):
@@ -318,6 +334,18 @@ class ScanClusterWriter(object):
                 source_name = ":detatched:"
             self.write("\t%s\t%s\n" % (source_name, member.id))
         self.write('\n')
+
+    def save_all(self, clusters):
+        for cluster in clusters:
+            self.save(cluster)
+
+
+class JSONScanClusterWriter(object):
+    def __init__(self, stream):
+        self.stream = stream
+
+    def save(self, cluster):
+        json.dump(self.stream, cluster.to_dict())
 
     def save_all(self, clusters):
         for cluster in clusters:
